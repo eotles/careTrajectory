@@ -1,9 +1,3 @@
-'''
-Created on Jun 24, 2016
-
-@author: eotles
-'''
-
 import pandas as pd
 import multiprocessing as mp
 
@@ -23,6 +17,9 @@ def set_globals(pt_col, enc_col, enc_date_col):
 def calc_pt_traj_extract(argDict):
     data = argDict['data']
     pt_id = argDict['pt_id']
+    _pt_col = argDict['_pt_col']
+    _enc_col = argDict['_enc_col']
+    _date_col = argDict['_date_col'] 
     
     pt_data = data[data[_pt_col] == pt_id]
     pt_data['offset'] = pt_data[_date_col] - pt_data[_date_col].iloc[0]
@@ -31,13 +28,15 @@ def calc_pt_traj_extract(argDict):
     results = (pt_id, pt_traj)
     return(results)
  
-#time = 0.0062*(num_pts) + 0.5249
-def traj_extract_pl(data, lim=None):    
+def traj_extract_pl(data, lim=None, processes=mp.cpu_count()-1):    
     pt_ids = data[_pt_col].unique()
     if lim is not None: pt_ids = pt_ids[0:lim]
-    args = [{'data': data, 'pt_id': pt_id} for pt_id in pt_ids]
+    args = [{'data': data, 'pt_id': pt_id, 
+             '_pt_col': _pt_col,
+             '_enc_col': _enc_col,
+             '_date_col': _date_col} for pt_id in pt_ids]
     
-    pool = mp.Pool()
+    pool = mp.Pool(processes=processes)
     results = pool.map(calc_pt_traj_extract, args)
     pool.close()
     pool.join()
@@ -76,44 +75,8 @@ def make_enc_traj_df(data, pt_col='MRN', enc_col='CSN', date_col='date', lim=Non
     enc_traj_df = pd.DataFrame(all_enc_trajs)
     return(enc_traj_df)
 
-def count_pile(pile_df, window=365):
-    for col in [_enc_col, _pt_col]:
-        #print(col)
-        tmp_pile_df = pile_df.groupby('offset')[col].nunique()
-        tmp_pile_df = tmp_pile_df.ix[-window:window]
-        pd.set_option('display.max_rows', len(tmp_pile_df))
-        #print('%s' %(tmp_pile_df.sort_index().to_string(dtype=False)))
-        pd.reset_option('display.max_rows')
-        return(tmp_pile_df)
-    
-def analyze(enc_traj_df, index_flags, window=365):
-    def cnt_fx_le(cnt):
-        return(cnt.ix[-window:-1].cumsum())
-    
-    def cnt_fx_ge(cnt):
-        return(cnt.ix[1:window].sum() - cnt.ix[1:window-1].cumsum())
-    
-    data = {}
-
-    enc_traj_df = enc_traj_df[(enc_traj_df['offset']>= -window) &
-                              (enc_traj_df['offset']<= window) ]
-
-    m_df = index_flags.merge(enc_traj_df, on='index', how='left')
-    for flag, flag_fx, cnt_fx in [('<=', lambda x:x<=0, cnt_fx_le), 
-                                  ('>=', lambda x:x>=0, cnt_fx_ge)]:
-
-        flag_pile = m_df[(m_df['flag'] == flag) &
-                         (m_df['offset'].apply(flag_fx))]
-        cnt = count_pile(flag_pile, window=window)
-        data[flag] = {'cnt': cnt_fx(cnt), '0': cnt.ix[0:0]}
-        
-    denom = data['<=']['0'].ix[0]
-    le_series = data['<=']['cnt'].append(data['<=']['0'])
-    ge_series = data['>=']['0'].append(data['>=']['cnt'])
-    tmp_df = pd.concat([le_series,ge_series], axis=1)
-    tmp_df.columns = ['LE', 'GE']
-    res_data = {'df': tmp_df, 'denom':denom}
-    return(res_data)
+def main():
+    pass
 
 if __name__ == '__main__':
-    pass
+    main()
