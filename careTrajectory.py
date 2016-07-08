@@ -84,6 +84,8 @@ class traj_extract():
         self.pt_col = pt_col
         self.enc_col = enc_col
         self.date_col = date_col
+        
+        self.all_comer_curve = self._curve_counter(list(df['index'].unique()))
     
     def _curve_counter(self, idxs):
         traj = self.df[self.df['index'].isin(idxs)]
@@ -107,27 +109,59 @@ class traj_extract():
         
         return(curve)
     
-    def plot_fig(self, curve_df):
-        #curve = self._curve_counter(idxs)
-        #curve = pd.Series(curve)
-        curve_df[0] = curve_df[0] / curve_df[0].max()
+    def plot_fig(self, idxs, name='curve', window=None,  all_comer=True, gauges=[]):
+        def prep_curve(curve_counter, name):
+            curve = pd.Series(curve_counter)
+            curve = curve/curve.max()
+            curve.name = name
+            return(curve)
+        
+        idxs_curve = self._curve_counter(idxs)
+        idxs_curve = prep_curve(idxs_curve, name=name)
+        curves = pd.DataFrame(idxs_curve)
+        if all_comer:
+            ac_name='*All Comers*'
+            ac_curve = prep_curve(self.all_comer_curve, name=ac_name)
+            curves[ac_name] = ac_curve
+            
+        if window is not None:
+            curves = curves.loc[-window:window]
+
         plt.figure(1)
-        plt.figure(figsize = (7,3))
-        gs1 = matplotlib.gridspec.GridSpec(3, 7)
+        plt.figure(figsize = (9,4))
+        gs1 = matplotlib.gridspec.GridSpec(4, 9)
+        gs1.update(wspace=0, hspace=0.05)
+        ax1 = plt.subplot(gs1[:,0:8])
+        ax2 = plt.subplot(gs1[:,8], sharey=ax1)
+        curves.plot(ax=ax1, kind='line', ylim=[0,1])
+        color='k'
+        for gauge in gauges:
+            ax2.axhline(y=gauge, color=color)
+            color='r'
+        plt.setp(ax2.get_xaxis(), visible=False)
+        plt.show()
+        
+        
+        '''
+        plt.figure(1)
+        plt.figure(figsize = (9,4))
+        gs1 = matplotlib.gridspec.GridSpec(8, 17)
         gs1.update(wspace=0, hspace=0.05)
         
-        ax1 = plt.subplot(gs1[:,0:3])
-        curve_df[0].loc[:-1].plot(ylim=[0,1])
+        ax1 = plt.subplot(gs1[:,0:8])
+        ax2 = plt.subplot(gs1[:,8], sharey=ax1)
+        ax3 = plt.subplot(gs1[:,9:17], sharey=ax1)
         
-        ax2 = plt.subplot(gs1[:,3], sharey=ax1)
-        curve_df_gb = curve_df.groupby('Admit').sum()
-        curve_df_gb[0] = curve_df_gb[0] / curve_df_gb[0].sum()
-        curve_df_gb[0].plot(kind='bar', stacked=True, ylim=[0,1])
+        curves.loc[:0].plot(ax=ax1, kind='line', ylim=[0,1], legend=False)
+        for gauge in gauges:
+            ax2.axhline(y=gauge)
+        curves.loc[0:].plot(ax=ax3, kind='line', ylim=[0,1])
         
-        ax3 = plt.subplot(gs1[:,4:7], sharey=ax1)
-        curve_df[0].loc[1:].plot(ylim=[0,1])
+        plt.setp(ax2.get_xaxis(), visible=False)
         
         plt.show()
+        '''
+        return(curves)
 
 
 if __name__ == '__main__':
